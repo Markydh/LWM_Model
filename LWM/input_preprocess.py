@@ -52,15 +52,17 @@ def tokenizer(selected_scenario_names=None, manual_data=None, gen_raw=True):
         cleaned_deepmimo_data = [deepmimo_data_cleaning(deepmimo_data[scenario_idx]) for scenario_idx in range(n_scenarios)]
         
         patches = [patch_maker(cleaned_deepmimo_data[scenario_idx]) for scenario_idx in range(n_scenarios)]
-        patches = np.vstack(patches)
-
+        patches = np.vstack(patches) # 把六个数据集的所用用户的信号矩阵叠
+   
     # Define dimensions
-    patch_size = patches.shape[2]
-    n_patches = patches.shape[1]
-    n_masks_half = int(0.15 * n_patches / 2)
+    # patch_size.shape -> 14840-128-16
+    patch_size = patches.shape[2]    # 补丁大小
+    n_patches = patches.shape[1]     # 补丁数
+    n_masks_half = int(0.15 * n_patches / 2) # 掩码数量 对于每个数据来说 128个补丁包括了实部和虚部
     # sequence_length = n_patches + 1
-    # element_length = patch_size
-    
+    # element_length = patch_size 
+
+    # 生成CLS补丁 MASK掩码
     word2id = {'[CLS]': 0.2 * np.ones((patch_size)), '[MASK]': 0.1 * np.ones((patch_size))}
 
     # Generate preprocessed channels
@@ -68,7 +70,7 @@ def tokenizer(selected_scenario_names=None, manual_data=None, gen_raw=True):
     for user_idx in tqdm(range(len(patches)), desc="Processing items"):
         sample = make_sample(user_idx, patches, word2id, n_patches, n_masks_half, patch_size, gen_raw=gen_raw)
         preprocessed_data.append(sample)
-            
+    # 返回14840个 信道信息  每个信道 分为 128个切片 一个切片大小为16
     return preprocessed_data
 
 #%%
@@ -78,6 +80,14 @@ def deepmimo_data_cleaning(deepmimo_data):
     return np.array(cleaned_deepmimo_data) * 1e6
 
 #%% Patch Creation
+# 返回格式
+# (1354, 128, 16)
+# (3248, 128, 16)
+# (3455, 128, 16)
+# (1902, 128, 16)
+# (2689, 128, 16)
+# (2192, 128, 16)
+# 6个数据集，对每个数据集都进行切分补丁 对于数据集一来说 1354个用户 每个用户的H矩阵进行切片，分为实部和虚部，分别是64个切片，切片大小为16
 def patch_maker(original_ch, patch_size=16, norm_factor=1e6):
     """
     Creates patches from the dataset based on the scenario.
@@ -103,7 +113,6 @@ def patch_maker(original_ch, patch_size=16, norm_factor=1e6):
     patch = np.zeros((len(flat_channels_complex), n_patches, patch_size))
     for idx in range(n_patches):
         patch[:, idx, :] = flat_channels_complex[:, idx * patch_size:(idx + 1) * patch_size]
-    
     return patch
 
 
@@ -211,8 +220,9 @@ def make_sample(user_idx, patch, word2id, n_patches, n_masks, patch_size, gen_ra
     Returns:
         sample (list): Generated sample for the user.
     """
-    
+    # 获取 数据集中的 用户的信道矩阵 shape (128,16)
     tokens = patch[user_idx]
+    # 在数据集中 加入 [CLS] 标记
     input_ids = np.vstack((word2id['[CLS]'], tokens))
     
     real_tokens_size = int(n_patches / 2)
@@ -231,6 +241,10 @@ def make_sample(user_idx, patch, word2id, n_patches, n_masks, patch_size, gen_ra
             elif rnd_num < 0.9:
                 input_ids[pos] = word2id['[MASK]']
                 
+
+    # input_ids：包含 [CLS] 标记和掩码操作后的输入数据，形状为 (129, 16)。
+    # masked_tokens：被掩盖补丁的原始值，用于计算模型的重建损失。
+    # masked_pos：掩盖补丁的索引，用于指导模型关注这些位置进行预测。
     return [input_ids, masked_tokens, masked_pos]
 
 

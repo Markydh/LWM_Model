@@ -13,7 +13,6 @@ import random
 import argparse
 from datetime import datetime
 import pandas as pd
-import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +20,7 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torch.optim import Adam
 import numpy as np
 import warnings
+
 warnings.filterwarnings('ignore')
 
 # LWM推理
@@ -31,10 +31,12 @@ def lwm_inference(preprocessed_chs, input_type, lwm_model, device):
     lwm_loss, embedding_data = evaluate(lwm_model, dataset)
     print(f'LWM loss: {lwm_loss:.4f}')
     
+
+    # 如果 input_type 为 cls_emb 则输出为 每一个补丁的cls部分 每个补丁129
     if input_type == 'cls_emb':
-        embedding_data = embedding_data[:, 0]
+        embedding_data = embedding_data[:, 0, :]
     elif input_type == 'channel_emb':  
-        embedding_data = embedding_data[:, 1:]
+        embedding_data = embedding_data[:, 1:,:]
     
     dataset = embedding_data.float()
     return dataset
@@ -61,13 +63,12 @@ def evaluate(model, dataloader):
     running_loss = 0.0
     outputs = []
     criterionMCM = nn.MSELoss()
-    
     with torch.no_grad():
         for idx, batch in enumerate(dataloader):
             input_ids = batch[0]
             masked_tokens = batch[1]
             masked_pos = batch[2]
-
+            
             logits_lm, output = model(input_ids, masked_pos)
             
             output_batch_preproc = output 
@@ -76,10 +77,9 @@ def evaluate(model, dataloader):
             loss_lm = criterionMCM(logits_lm, masked_tokens)
             loss = loss_lm / torch.var(masked_tokens)  
             running_loss += loss.item()
-            
+
     average_loss = running_loss / len(dataloader)
     output_total = torch.cat(outputs, dim=0)
-    
     return average_loss, output_total
 
 # 创建原始数据集
@@ -87,5 +87,6 @@ def create_raw_dataset(data, device):
     """Create a dataset for raw channel data."""
     input_ids, _, _ = zip(*data)
     input_data = torch.tensor(input_ids, device=device)[:, 1:]  
+    print(input_data.shape)
     return input_data.float()
     

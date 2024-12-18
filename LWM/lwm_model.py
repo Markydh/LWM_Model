@@ -115,7 +115,6 @@ class lwm(torch.nn.Module):
     @classmethod
     def from_pretrained(cls, ckpt_name='model_weights.pth', device='cuda', use_auth_token=None):
         model = cls().to(device)
-
         # 获取当前文件的绝对路径
         current_dir = os.path.dirname(os.path.realpath(__file__))
         ckpt_path = os.path.join(current_dir, ckpt_name)
