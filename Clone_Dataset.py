@@ -1,13 +1,12 @@
 import subprocess
 import os
 import numpy as np
-from FirstStep import clone_dataset_scenarios
 
 # 用于克隆特定的数据集场景文件夹
 def clone_dataset_scenario(scenario_name, repo_url, model_repo_dir="./LWM", scenarios_dir="scenarios_test"):
     current_dir = os.path.basename(os.getcwd())
     if current_dir == "LWM":
-        model_repo_dir = "."
+        model_repo_dir = "./LWM"
 
     # Create the scenarios_test directory if it doesn't exist
     scenarios_path = os.path.join(model_repo_dir, scenarios_dir)
